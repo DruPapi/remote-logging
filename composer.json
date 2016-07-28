@@ -1,0 +1,28 @@
+{
+    "name": "drupapi/remote-logging",
+    "description": "DruPapi's logger into collectd / InfluxDB",
+    "keywords": [
+        "laravel",
+        "logging"
+    ],
+    "license": "MIT",
+    "homepage": "http://popkod.hu",
+    "authors": [
+        {
+            "name": "DruPapi",
+            "email": "drupapi@popkod.hu"
+        }
+    ],
+    "require": {
+        "php": ">=5.5.9",
+        "illuminate/contracts": "5.2.*",
+        "illuminate/support": "5.2.*",
+        "monolog/monolog": "~1.11"
+    },
+    "autoload": {
+        "psr-4": {
+            "Popkod\\Log\\": "src/"
+        }
+    },
+    "minimum-stability": "dev"
+}
