@@ -21,7 +21,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Popkod\\Log\\": "src/"
+            "Popkod\\": "src/Popkod/"
         }
     },
     "minimum-stability": "dev"
