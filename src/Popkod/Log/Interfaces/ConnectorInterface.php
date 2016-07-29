@@ -6,5 +6,5 @@ interface ConnectorInterface
 {
     public function __construct($instance);
 
-    public function sendMessage($level, $message);
+    public function sendMessage($level, $message, $levelValue);
 }

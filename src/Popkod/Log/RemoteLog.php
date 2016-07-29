@@ -5,6 +5,8 @@ namespace Popkod\Log;
 use Monolog\Logger;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Contracts\Support\Jsonable;
+use Illuminate\Contracts\Support\Arrayable;
 use Popkod\Log\Interfaces\ConnectorInterface as Connector;
 
 class RemoteLog
@@ -35,6 +37,13 @@ class RemoteLog
     protected $disableForwardingToLocalLog;
 
     /**
+     * @uses writeRemote()
+     * @uses writeWithLocal()
+     * @var string
+     */
+    protected $writeLog;
+
+    /**
      * @var Connector[]
      */
     protected $connectors = [];
@@ -49,7 +58,11 @@ class RemoteLog
             $this->hostName = gethostname();
         }
 
-        $this->disableForwardingToLocalLog = Config::get('remotelogging.disableForwardingToLocalLog', true);
+        if (Config::get('remotelogging.disableForwardingToLocalLog', true)) {
+            $this->writeLog = 'writeRemote';
+        } else {
+            $this->writeLog = 'writeWithLocal';
+        }
 
         $connectors = Config::get('remotelogging.connectors', false);
         if ($connectors !== false) {
@@ -71,9 +84,19 @@ class RemoteLog
         return array_unshift($this->connectors, $connector);
     }
 
+    public function __call($name, $arguments)
+    {
+        if (array_key_exists($name, $this->levels)) {
+            array_unshift($arguments, $name);
+            call_user_func_array([$this, 'log'], $arguments);
+        }
+    }
+
     /**
      * Log a message to the logs.
      *
+     * @uses $this->writeRemote()
+     * @uses $this->writeWithLocal()
      * @param  string  $level
      * @param  string  $message
      * @param  array  $context
@@ -81,127 +104,48 @@ class RemoteLog
      */
     public function log($level, $message, array $context = [])
     {
-        $this->disableForwardingToLocalLog || Log::log($level, $message, $context);
-        $this->writeLog($level, $message);
+        $this->writeLog($level, $message, $context);
     }
 
-    /**
-     * Log a debug message to the remote server.
-     *
-     * @param  string  $message
-     * @param  array  $context
-     * @return void
-     */
-    public function debug($message, array $context = [])
+    protected function writeRemote($level, $message, $context = [])
     {
-        $this->disableForwardingToLocalLog || Log::debug($message, $context);
-        $this->writeLog('debug', $message);
-    }
-
-    /**
-     * Log an informational message to the remote server.
-     *
-     * @param  string  $message
-     * @param  array  $context
-     * @return void
-     */
-    public function info($message, array $context = [])
-    {
-        $this->disableForwardingToLocalLog || Log::info($message, $context);
-        $this->writeLog('info', $message);
-    }
-
-    /**
-     * Log a notice message to the remote server.
-     *
-     * @param  string  $message
-     * @param  array  $context
-     * @return void
-     */
-    public function notice($message, array $context = [])
-    {
-        $this->disableForwardingToLocalLog || Log::notice($message, $context);
-        $this->writeLog('notice', $message);
-    }
-
-    /**
-     * Log a warning message to the remote server.
-     *
-     * @param  string  $message
-     * @param  array  $context
-     * @return void
-     */
-    public function warning($message, array $context = [])
-    {
-        $this->disableForwardingToLocalLog || Log::warning($message, $context);
-        $this->writeLog('warning', $message);
-    }
-
-    /**
-     * Log an error message to the remote server.
-     *
-     * @param  string  $message
-     * @param  array  $context
-     * @return void
-     */
-    public function error($message, array $context = [])
-    {
-        $this->disableForwardingToLocalLog || Log::error($message, $context);
-        $this->writeLog('error', $message);
-    }
-
-    /**
-     * Log a critical message to the remote server.
-     *
-     * @param  string  $message
-     * @param  array  $context
-     * @return void
-     */
-    public function critical($message, array $context = [])
-    {
-        $this->disableForwardingToLocalLog || Log::critical($message, $context);
-        $this->writeLog('critical', $message);
-    }
-
-    /**
-     * Log an alert message to the remote server.
-     *
-     * @param  string  $message
-     * @param  array  $context
-     * @return void
-     */
-    public function alert($message, array $context = [])
-    {
-        $this->disableForwardingToLocalLog || Log::alert($message, $context);
-        $this->writeLog('alert', $message);
-    }
-
-    /**
-     * Log an emergency message to the remote server.
-     *
-     * @param  string  $message
-     * @param  array  $context
-     * @return void
-     */
-    public function emergency($message, array $context = [])
-    {
-        $this->disableForwardingToLocalLog || Log::emergency($message, $context);
-        $this->writeLog('emergency', $message);
-    }
-
-    protected function writeLog($level, $message)
-    {
-        if ($this->levels[$level] < $this->minRemoteLogLevelValue) {
+        if (!array_key_exists($level, $this->levels) || $this->levels[$level] < $this->minRemoteLogLevelValue) {
             return false;
         }
 
         reset($this->connectors);
         while ($connector = current($this->connectors)) {
             /* @type Connector $connector */
-            $connector->sendMessage($level, $message);
+            $connector->sendMessage($level, $message, $this->levels[$level]);
             next($this->connectors);
         }
 
         return true;
+    }
+
+    protected function writeWithLocal($level, $message, $context = [])
+    {
+        Log::log($level, $message, $context);
+        $this->writeRemote($level, $message, $context);
+    }
+
+
+    /**
+     * Format the parameters for the logger.
+     *
+     * @param  mixed  $message
+     * @return mixed
+     */
+    protected function formatMessage($message)
+    {
+        if (is_array($message)) {
+            return var_export($message, true);
+        } elseif ($message instanceof Jsonable) {
+            return $message->toJson();
+        } elseif ($message instanceof Arrayable) {
+            return var_export($message->toArray(), true);
+        }
+
+        return $message;
     }
 }
