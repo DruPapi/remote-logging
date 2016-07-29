@@ -8,6 +8,6 @@ class LogFacade extends Facade
 {
     protected static function getFacadeAccessor()
     {
-        return 'log';
+        return 'remote-log';
     }
 }

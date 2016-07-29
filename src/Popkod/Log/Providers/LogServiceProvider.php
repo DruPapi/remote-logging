@@ -16,6 +16,7 @@ class LogServiceProvider extends ServiceProvider
     {
         //
     }
+
     /**
      * Register the application services.
      *
@@ -23,9 +24,9 @@ class LogServiceProvider extends ServiceProvider
      */
     public function register()
     {
-        App::bind('log', function()
+        App::bind('remote-log', function()
         {
-            return new \Popkod\Log\Log;
+            return new \Popkod\Log\RemoteLog;
         });
     }
 }
